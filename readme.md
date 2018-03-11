@@ -11,6 +11,7 @@ This is a forked project from Accounting.js.
 Forked version has the following changes.
 
 1.The toFixed precision method has precision values determined by exponentials.
+
 2.Grouping currencies option has been introduced. The default value for grouping numbers is 3.
   e.g., 12,345,678.67  --> After the thousands place , the digits are grouped based on the given option.
 
