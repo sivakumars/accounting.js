@@ -17,7 +17,7 @@
 	var lib = {};
 
 	// Current version
-	lib.version = '0.4.2';
+	lib.version = '0.4.1';
 
 
 	/* --- Exposed settings --- */
@@ -58,7 +58,7 @@
 	}
 
 	/**
-	 * Tests whether supplied parameter is an array
+	 * Tests whether supplied parameter is a string
 	 * from underscore.js, delegates to ECMA5's native Array.isArray
 	 */
 	function isArray(obj) {
@@ -85,7 +85,7 @@
 		for (key in defs) {
 			if (defs.hasOwnProperty(key)) {
 				// Replace values with defaults only if undefined (allow empty/zero values):
-				if (object[key] == null) object[key] = defs[key];
+				if (object[key] == undefined) object[key] = defs[key];
 			}
 		}
 		return object;
@@ -161,6 +161,13 @@
 		return format;
 	}
 
+	function reverseString(value){
+		if(typeof value !== "string"){
+			throw new Error("PLease use a valid string");
+		}
+
+		return value.split('').reverse().join('');
+	}
 
 	/* --- API Methods --- */
 
@@ -176,6 +183,13 @@
 	 *
 	 * Doesn't throw any errors (`NaN`s become 0) but this may change in future
 	 */
+
+	 /*
+		if the value is passed as a number ,  it doesn't throw any error.
+		The unformatted output  is not checking for precision before returning 
+		eg :  "$ 123,345,567.00"   becomes 123345567   (losing the precision)
+	 */
+
 	var unformat = lib.unformat = lib.parse = function(value, decimal) {
 		// Recursively unformat arrays:
 		if (isArray(value)) {
@@ -197,7 +211,7 @@
 		var regex = new RegExp("[^0-9-" + decimal + "]", ["g"]),
 			unformatted = parseFloat(
 				("" + value)
-				.replace(/\((?=\d+)(.*)\)/, "-$1") // replace bracketed values with negatives
+				.replace(/\((.+)\)/, "-$1") // replace bracketed values with negatives
 				.replace(regex, '')         // strip out any cruft
 				.replace(decimal, '.')      // make sure decimal point is standard
 			);
@@ -215,11 +229,10 @@
 	 */
 	var toFixed = lib.toFixed = function(value, precision) {
 		precision = checkPrecision(precision, lib.settings.number.precision);
+		var rounded = Math.round(Number(value+'e'+precision));
 
-		var exponentialForm = Number(lib.unformat(value) + 'e' + precision);
-		var rounded = Math.round(exponentialForm);
-		var finalResult = Number(rounded + 'e-' + precision).toFixed(precision);
-		return finalResult;
+		// Multiply up by precision, round accurately, then divide and use native toFixed():
+		return Number(rounded+'e-'+precision).toFixed(precision);
 	};
 
 
@@ -230,7 +243,7 @@
 	 * Localise by overriding the precision and thousand / decimal separators
 	 * 2nd parameter `precision` can be an object matching `settings.number`
 	 */
-	var formatNumber = lib.formatNumber = lib.format = function(number, precision, thousand, decimal) {
+	var formatNumber = lib.formatNumber = lib.format = function(number, precision, thousand, decimal,grouping) {
 		// Resursively format arrays:
 		if (isArray(number)) {
 			return map(number, function(val) {
@@ -246,7 +259,8 @@
 				(isObject(precision) ? precision : {
 					precision : precision,
 					thousand : thousand,
-					decimal : decimal
+					decimal : decimal,
+					grouping : grouping
 				}),
 				lib.settings.number
 			),
@@ -254,13 +268,33 @@
 			// Clean up precision
 			usePrecision = checkPrecision(opts.precision),
 
-			// Do some calc:
-			negative = number < 0 ? "-" : "",
-			base = parseInt(toFixed(Math.abs(number || 0), usePrecision), 10) + "",
-			mod = base.length > 3 ? base.length % 3 : 0;
+			//use Grouping 
+			grouping = opts.grouping ? opts.grouping : lib.settings.number.grouping;
+
+		var negative = number < 0 ? "-" : "";
+		var base = parseInt(toFixed(Math.abs(number || 0), usePrecision), 10) + "";			
+		var output;
+		if(base.length <= 3){
+			output = base +
+				   (usePrecision ? opts.decimal + toFixed(Math.abs(number), usePrecision).split('.')[1] : ""); 
+			
+			return negative + output;					   
+		}
 
 		// Format the number:
-		return negative + (mod ? base.substr(0, mod) + opts.thousand : "") + base.substr(mod).replace(/(\d{3})(?=\d)/g, "$1" + opts.thousand) + (usePrecision ? opts.decimal + toFixed(Math.abs(number), usePrecision).split('.')[1] : "");
+		// hardcoded value : 3  ==>  for thousands place.
+		// 12345667 ---> 76654321 (reversed value) ---> 766, (thousand places) + 543,21 ---> 766,543,21  ---> 12,345,667 
+
+		var reverseBase = reverseString(base); // reverse the string
+		var regexliteral = '(\\d{'+grouping+'})(?=\\d)'; // regex to match digits for grouping
+		var regexForGrouping = new RegExp(regexliteral, "g");
+		var reverseBaseFormat = reverseBase.substr(0,3) +  opts.thousand +  // apply thousands seperator after the third digit
+					 			reverseBase.substr(3).replace(regexForGrouping, "$1"+opts.thousand); // apply the regex from the fourth digit and replace it with seperator
+
+		output = reverseString(reverseBaseFormat) + (usePrecision ? opts.decimal + toFixed(Math.abs(number), usePrecision).split('.')[1] : ""); 
+	
+		// return negative + (mod ? base.substr(0, mod) + opts.thousand : "") + base.substr(mod).replace(/(\d{3})(?=\d)/g, "$1" + opts.thousand) + (usePrecision ? opts.decimal + toFixed(Math.abs(number), usePrecision).split('.')[1] : "");
+		return negative + output;
 	};
 
 
@@ -275,7 +309,7 @@
 	 *
 	 * To do: tidy up the parameters
 	 */
-	var formatMoney = lib.formatMoney = function(number, symbol, precision, thousand, decimal, format) {
+	var formatMoney = lib.formatMoney = function(number, symbol, precision, thousand, decimal, format,grouping) {
 		// Resursively format arrays:
 		if (isArray(number)) {
 			return map(number, function(val){
@@ -293,7 +327,8 @@
 					precision : precision,
 					thousand : thousand,
 					decimal : decimal,
-					format : format
+					format : format,
+					grouping: grouping
 				}),
 				lib.settings.currency
 			),
@@ -305,7 +340,7 @@
 			useFormat = number > 0 ? formats.pos : number < 0 ? formats.neg : formats.zero;
 
 		// Return with currency symbol added:
-		return useFormat.replace('%s', opts.symbol).replace('%v', formatNumber(Math.abs(number), checkPrecision(opts.precision), opts.thousand, opts.decimal));
+		return useFormat.replace('%s', opts.symbol).replace('%v', formatNumber(Math.abs(number), checkPrecision(opts.precision), opts.thousand, opts.decimal,opts.grouping));
 	};
 
 
@@ -321,8 +356,8 @@
 	 * NB: `white-space:pre` CSS rule is required on the list container to prevent
 	 * browsers from collapsing the whitespace in the output strings.
 	 */
-	lib.formatColumn = function(list, symbol, precision, thousand, decimal, format) {
-		if (!list || !isArray(list)) return [];
+	lib.formatColumn = function(list, symbol, precision, thousand, decimal, format,grouping) {
+		if (!list) return [];
 
 		// Build options object from second param (if object) or all params, extending defaults:
 		var opts = defaults(
@@ -331,7 +366,8 @@
 					precision : precision,
 					thousand : thousand,
 					decimal : decimal,
-					format : format
+					format : format,
+					grouping : grouping
 				}),
 				lib.settings.currency
 			),
@@ -350,17 +386,11 @@
 				if (isArray(val)) {
 					// Recursively format columns if list is a multi-dimensional array:
 					return lib.formatColumn(val, opts);
-				} else {
-					// Clean up the value
-					val = unformat(val);
-
-					// Choose which format to use for this value (pos, neg or zero):
-					var useFormat = val > 0 ? formats.pos : val < 0 ? formats.neg : formats.zero,
-
-						// Format this value, push into formatted list and save the length:
-						fVal = useFormat.replace('%s', opts.symbol).replace('%v', formatNumber(Math.abs(val), checkPrecision(opts.precision), opts.thousand, opts.decimal));
-
-					if (fVal.length > maxLength) maxLength = fVal.length;
+				} else {					
+					fVal = formatMoney(Math.abs(val), checkPrecision(opts.precision), opts.thousand, opts.decimal,opts.grouping);
+					if (fVal.length > maxLength) {
+						maxLength = fVal.length;
+					}
 					return fVal;
 				}
 			});
