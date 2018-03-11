@@ -6,6 +6,14 @@ Please checkout or download the latest stable tag before using in production. [B
 
 Maintained by [Open Exchange Rates](https://openexchangerates.org "Free reliable exchange rates/currency conversion data API") and originally by [@josscrowcroft](http://twitter.com/josscrowcroft) and other [contributors](https://github.com/openexchangerates/accounting.js/contributors).
 
+This is a forked project from Accounting.js.  
+
+Forked version has the following changes.
+
+1.The toFixed precision method has precision values determined by exponentials.
+2.Grouping currencies option has been introduced. The default value for grouping numbers is 3.
+  e.g., 12,345,678.67  --> After the thousands place , the digits are grouped based on the given option.
+
 ---
 
 ### Works great with:
