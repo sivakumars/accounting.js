@@ -13,12 +13,11 @@ describe('formatNumber', function(){
 
         });
 
-        it('should fix floating point rounding error', function(){
+        it('should fix floting point rounding error', function(){
 
             expect( accounting.formatNumber(0.615, 2) ).toBe( '0.62' );
             expect( accounting.formatNumber(0.614, 2) ).toBe( '0.61' );
-            expect( accounting.formatNumber(1.005, 2) ).toBe( '1.01');
-
+            expect( accounting.formatNumber(1.005, 2) ).toBe( '1.01' );
         });
 
         it('should work for large numbers', function(){
@@ -85,12 +84,23 @@ describe('formatNumber', function(){
             expect( accounting.formatNumber(98765432.12, 4, '[', ']') ).toBe( '98[765[432]1200' );
         });
 
+        it('should allow setting thousand and decimal separators and grouping', function(){
+            expect( accounting.formatNumber(12345, 2, ',', '.', 2) ).toBe('12,345.00');
+            expect( accounting.formatNumber(7212345.12345, 2, ',', '.', 0) ).toBe('7,212,345.12');
+            expect( accounting.formatNumber(7212345.12345, 2, ',', '.', 2) ).toBe('72,12,345.12');
+            expect( accounting.formatNumber(72112345.12345, 2, ',', '.', 3) ).toBe('72,112,345.12');
+        });
+
         it('should use default separators if null', function(){
             expect( accounting.formatNumber(12345.12345, 2, null, null) ).toBe('12,345.12');
         });
 
         it('should use empty separators if passed as empty string', function(){
             expect( accounting.formatNumber(12345.12345, 2, '', '') ).toBe('1234512');
+        });
+
+        it('should allow grouping of place values as an option', function(){
+            expect( accounting.formatNumber(12345.12345, 2, null, null, 2) ).toBe('12,345.12');
         });
 
     });
@@ -107,6 +117,14 @@ describe('formatNumber', function(){
             expect( vals[2] ).toBe( '1,234.12' );
         });
 
+        it('should handle nested array of numbers', function(){
+
+            var vals = accounting.formatNumber([123, [456.78, 1234.123], 5478.89], 2);
+
+            expect( vals[0] ).toBe( '123.00' );
+            expect( vals[1].toString() ).toBe( '456.78,1,234.12' );
+            expect( vals[2] ).toBe( '5,478.89' );
+        });
     });
 
     describe('properties object', function(){
@@ -125,6 +143,18 @@ describe('formatNumber', function(){
         it('properties should be optional', function(){
             var val = accounting.formatNumber(123456789.1234, {});
             expect( val ).toBe( '123,456,789' );
+        });
+
+        it('should accept a grouping option in the properties Object', function(){
+
+            var val = accounting.formatNumber(123456789.1234, {
+                thousand : ',',
+                decimal : '.',
+                precision : 3,
+                grouping : 2
+            });
+
+            expect( val ).toBe( '12,34,56,789.123' );
         });
 
     });
